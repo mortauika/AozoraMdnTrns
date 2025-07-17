@@ -1,0 +1,29 @@
+﻿<div id="customContextMenu" class="custom-context-menu">
+	<ul>
+		<li data-action="bookmark-set-un-set" title="ブックマークON/OFF (b)"><img src="./img/bookmark.svg" /></li>
+		<li data-action="bookmark-list-open" title="目次/ブックマーク一覧 ( Alt + b | Shift + b )"><img
+				src="./img/iconmonstr-gallery-list-lined.svg" />
+		</li>
+		<li id="shareToTwitter" data-action="share-to-twitter" title="Twitter（現X）に共有"><img
+				src="./img/iconmonstr-twitter-1.svg" /></li>
+		<li id="contextMenuClose" data-action="close" title="閉じる (Esc)"><img src="./img/x-mark.svg" /></li>
+	</ul>
+</div>
+<div id="bookmarkListsModal" class="modal-overlay">
+	<div class="modal-content">
+		<div class="close-button">
+			<svg clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2"
+				viewBox="0 0 24 24" fill="#aaa" xmlns="http://www.w3.org/2000/svg">
+				<path
+					d="m12 10.93 5.719-5.72c.146-.146.339-.219.531-.219.404 0 .75.324.75.749 0 .193-.073.385-.219.532l-5.72 5.719 5.719 5.719c.147.147.22.339.22.531 0 .427-.349.75-.75.75-.192 0-.385-.073-.531-.219l-5.719-5.719-5.719 5.719c-.146.146-.339.219-.531.219-.401 0-.75-.323-.75-.75 0-.192.073-.384.22-.531l5.719-5.719-5.72-5.719c-.146-.147-.219-.339-.219-.532 0-.425.346-.749.75-.749.192 0 .385.073.531.219z" />
+			</svg>
+		</div>
+		<h2><img src="./img/bookmark-blue.svg"
+				style="height: 0.7em; width: 0.7em; margin: 0.3em 0.3em 0 -0.3em;" />ブックマーク</h2>
+		<ul id="bookmarkList" class="modal-list">
+		</ul>
+		<h2>目次</h2>
+		<ul id="indexList" class="modal-list">
+		</ul>
+	</div>
+</div>

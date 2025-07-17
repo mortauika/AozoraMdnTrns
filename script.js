@@ -1,0 +1,763 @@
+﻿/**
+ * @file script.js
+ * @brief 青空文庫現代語訳HTMLの主要なスクリプト。
+ * @author もるたう
+ * @copyright © 2025 もるたう. All rights reserved.
+ */
+
+// **** 定義 ****
+/** feature-content.html の読み込み完了の解決 */
+const loadFeatureContent = loadHtmlFile('feature-content.html', 'header');
+
+// **** 変数 ****
+/** 本文行数 */
+let mainRowCount = 0;
+/** ブックマークリスト */
+let bookmarkRows = [];
+
+// **** 関数 ****
+
+/**
+ * テキストから「［＃N字下げ］」形式の字下げ指定を抽出し、その数値と指定削除後のテキストを返す。
+ * @brief
+ * * 全角数字は半角に変換され、数値として返される。
+ * * 複数マッチ時は最初の字下げ指定のみが処理される。
+ * @param {string} text - 処理対象となる行のテキスト。
+ * @returns {{number: number, cleanedLine: string}|null} 
+ * * 字下げ数 (`number`) と削除後のテキスト (`cleanedLine`) を持つオブジェクト、
+ *   または指定が見つからない場合は `null`。
+ */
+function extractIndentInfo(line) {
+	// ［＃ に始まり、数字（1桁以上）、字下げ］で終わるパターン
+	const pattern = /［＃\s*(\p{Number}+)\s*字下げ］/gu;
+	// マッチした文字列を抽出
+	const matches = Array.from(line.matchAll(pattern));
+	if (matches.length > 0) {
+		return {
+			// 全角数字を含む文字列を半角数字に変換し、数値にする
+			// { number: 字下げ数, cleanedLine: ［＃(数字)字下げ］の文字列削除した文字列 }
+			number: Number(matches[0][1].normalize('NFKC')), cleanedLine: line.replace(pattern, '')
+		};
+	} else {
+		return null;
+	}
+}
+
+/**
+ * テキスト行に含まれるルビ指定をHTMLの<ruby>タグ形式に変換する。
+ * @brief
+ *   「漢字《ひらがな》」または「｜漢字《ひらがな》」の形式に対応する。
+ *   * 正規表現に日本語の漢字とひらがな、カタカナのUnicodeプロパティを使用
+ *   * 「漢字《ひらがな》」 => <ruby><rb>漢字</rb><rb>漢字</rb><rp>（</rp><rt>ひらがな</rt><rp>）</rp></ruby>
+ * @param {string} line - 処理対象となる1行のテキスト。
+ * @returns {string} ルビがHTML <ruby>タグに変換された後の文字列。
+ */
+function convertRubyToHtml(line) {
+	// 「｜漢字《ひらがな》」の形式を処理するための正規表現
+	const tategakiRubyPattern = /｜(\p{sc=Han}+?)《([\p{sc=Hiragana}\p{sc=Katakana}]+?)》/gu;
+	// 「｜漢字《ひらがな》」-> <ruby><rb>漢字</rb><rp>（</rp><rt>ひらがな</rt><rp>）</rp></ruby>
+	let processedLine = line.replace(tategakiRubyPattern, (match, kanji, ruby) => {
+		return `<ruby><rb>${kanji}</rb><rp>（</rp><rt>${ruby}</rt><rp>）</rp></ruby>`;
+	});
+
+	// 漢字《ひらがな》」の形式を処理するための正規表現
+	const normalRubyPattern = /(\p{sc=Han}+?)《([\p{sc=Hiragana}\p{sc=Katakana}]+?)》/gu;
+	// 「漢字《ひらがな》」-> <ruby><rb>漢字</rb><rp>（</rp><rt>ひらがな</rt><rp>）</rp></ruby>
+	processedLine = processedLine.replace(normalRubyPattern, (match, kanji, ruby) => {
+		return `<ruby><rb>${kanji}</rb><rp>（</rp><rt>${ruby}</rt><rp>）</rp></ruby>`;
+	});
+
+	return processedLine;
+}
+
+/**
+ * テキストに含まれるURLをリンクにする
+ * @brief http:// または https:// で始まるURLを
+ * @param {*} text 対象となるテキスト
+ * @returns URLがリンクに置換されたテキスト
+ */
+function convertUrlsToLinks(text) {
+	// 正規表現で http:// または https:// で始まるURLを検出
+	const urlRegex = /(https?:\/\/[^\s<>'\{\}\[\]`:]+)/g;
+	// テキストをリンクに置換して返す
+	return text.replace(urlRegex, function (url) {
+		let balance = 0, removeIndex = -1, after = '';
+		// マッチしたURL文字列の末尾から文字をチェック
+		for (let i = 0; i < url.length; i++) {
+			const char = url[i];
+			if (char === ')' || char === '）') {
+				balance--;
+			} else if (char === '(' || char === '（') {
+				balance++;
+			}
+			// バランスがマイナスになった場合、その括弧はURLの一部ではないと判断
+			// ここで removeIndex を設定し、それ以降を削除する
+			if (balance < 0) {
+				removeIndex = i;
+				break;
+			}
+		}
+		// removeIndex が設定されていれば、そこまでの部分を finalUrl とする
+		if (removeIndex !== -1) {
+			after = url.substring(removeIndex);
+			url = url.substring(0, removeIndex);
+		}
+		// キャプチャされたURLを<a>タグで囲む
+		if (balance <= 0 && url.length >= 12) {
+			return `<a href='${url}' target='_blank' rel='noopener noreferrer'>${url}</a>${after}`;
+		} else {
+			// 短すぎるものは不正なURLとしてリンクにしない
+			// (が閉じられていない、破綻したものはリンクにしない
+			return url;
+		}
+	});
+}
+
+/**
+ * 吹き出しの位置をトリガー要素の上に配置する関数
+ * @param {HTMLElement} triggerElement - 吹き出しを表示するトリガーとなる要素
+ * @param {HTMLElement} tooltipElement - 表示する吹き出し要素
+ */
+function positionTooltip(triggerElement, tooltipElement) {
+	// トリガー要素の画面上の位置とサイズを取得
+	const triggerRect = triggerElement.getBoundingClientRect();
+	// 吹き出し要素の現在のサイズを取得 (表示されていないと0になる場合があるので注意)
+	const tooltipRect = tooltipElement.getBoundingClientRect();
+	// 文字サイズ
+	const fontSizePx = parseFloat(window.getComputedStyle(tooltipElement).fontSize);
+
+	// 吹き出しをトリガー要素の上に配置するための計算
+	const topPosition = triggerRect.top + window.scrollY - tooltipRect.height - fontSizePx;
+	const leftPosition = triggerRect.left + window.scrollX - fontSizePx;	/* 左寄せ */
+	// const leftPosition = triggerRect.left + window.scrollX + (triggerRect.width / 2) - (tooltipRect.width / 2); /* 中央揃え */
+
+	// 画面の端からはみ出さないように調整 (左右)
+	const screenPadding = fontSizePx; // 画面端からのパディング
+	let finalLeft = Math.max(screenPadding, leftPosition);
+	if (finalLeft + tooltipRect.width + screenPadding > window.innerWidth) {
+		finalLeft = window.innerWidth - tooltipRect.width - screenPadding * 3;
+	}
+	// 画面の端からはみ出さないように調整 (上端)
+	// スクロール位置を考慮する
+	let finalTop = Math.max(window.scrollY + screenPadding, topPosition);
+
+	tooltipElement.style.top = `${finalTop}px`;
+	tooltipElement.style.left = `${finalLeft}px`;
+}
+
+/**
+ * ブックマーク済みの行番号を配列で取得する。
+ * @breif `main` 要素内の `.bookmark` クラスを持つ要素から、
+ *   `row-XXX` 形式のidに定義されている行番号 (XXX) を抽出し、
+ *   その数値の配列を返す。
+ * @returns {number[]} ブックマーク行番号の配列
+ */
+function getBookmarkRows() {
+	return Array.from(document.querySelector('main').querySelectorAll('.bookmark'))
+		.map(element => {
+			// 正規表現で 'row-\d' の数字をキャプチャグループで取得
+			const match = element.id.match(/row-(\d+)\b/);
+			// マッチが見つかれば 数字 を、見つからなければ null を返す
+			return match ? Number(match[1]) : null;
+		})
+		// 有効な数値だけをフィルタリング
+		.filter(number => number !== null);
+}
+
+/**
+ * 外部のHTMLファイルを読み込み、指定した要素に挿入する関数
+ * @param {string} url 読み込むHTMLファイルのURL
+ * @param {string} targetSelector 読み込んだHTMLを挿入するCSSセレクタ (例: '#content-area')
+ */
+async function loadHtmlFile(url, targetSelector) {
+	const targetElement = document.querySelector(targetSelector);
+
+	if (!targetElement) {
+		console.error(`Error: Target element with selector '${targetSelector}' not found.`);
+		return;
+	}
+
+	try {
+		const response = await fetch(url);
+
+		if (!response.ok) {
+			// HTTPエラー（404 Not Found, 500 Internal Server Errorなど）の場合
+			throw new Error(`HTTP error! status: ${response.status}`);
+		}
+
+		// レスポンスボディをテキストとして取得
+		const htmlContent = await response.text();
+		// 取得したHTMLを要素に挿入
+		targetElement.innerHTML += htmlContent;
+
+		console.log(`Successfully loaded ${url} into ${targetSelector}`);
+	} catch (error) {
+		console.error('Failed to load HTML file:', error);
+	}
+}
+
+// **** 起動時実行処理 ****
+
+// ローカルストレージからブックマークリストを読み込む
+bookmarkRows = (localStorage.getItem("aozoraModernJapaneseTranslation_BookmarkRows") ?? '')
+	.split(',').map(row => row ? Number(row) : null).filter(number => number !== null);
+
+// 起動時ドキュメント読み込み後の処理
+document.addEventListener('DOMContentLoaded', async function () {
+	[document.querySelector('main'), document.querySelector('footer')].forEach((currentElement) => {
+		const preSourceTextElement = currentElement.querySelector('pre');
+		const sourceText = preSourceTextElement.innerText.trim();
+		const isMainContents = currentElement === document.querySelector('main');
+		let rowNumber = 0;
+		currentElement.innerHTML = '';
+		sourceText.split('\n').forEach((line, index) => {
+			if (line) {
+				const pElement = document.createElement('p');
+				if (line.indexOf('bf:') === 0) {
+					rowNumber++;
+					if (isMainContents) {
+						pElement.id = `original-row-${rowNumber}`;
+					}
+					pElement.classList.add('original-text');
+					line = line.substring(3);
+				} else if (line.indexOf('af:') === 0) {
+					if (isMainContents) {
+						pElement.id = `translated-row-${rowNumber}`;
+					}
+					pElement.classList.add('translated-text');
+					if (bookmarkRows.includes(rowNumber)) {
+						pElement.classList.add('bookmark');
+					}
+					pElement.dataset.originalTarget = `original-row-${rowNumber}`;
+					line = line.substring(3);
+				} else {
+					rowNumber++;
+					if (isMainContents) {
+						pElement.id = `row-${rowNumber}`;
+					}
+				}
+				const indentInfo = extractIndentInfo(line);
+				if (indentInfo) {
+					const newH2Element = document.createElement('h2');
+					newH2Element.id = pElement.id;
+					newH2Element.className = pElement.className;
+					newH2Element.style.textIndent = `${indentInfo.number}em`;
+					// ［＃...は中見出し］ の 注釈を削除
+					line = indentInfo.cleanedLine.replace(/［＃[^］]*は中見出し］/g, '');
+					// ルビ指定をHTMLの<ruby>に変換する
+					line = convertRubyToHtml(line);
+					// <h2>タグを<main>に投入する
+					newH2Element.innerHTML = line;
+					currentElement.appendChild(newH2Element);
+				} else {
+					// ［＃...は中見出し］ の 注釈を削除
+					line = line.replace(/［＃[^］]*は中見出し］/g, '');
+					line = convertUrlsToLinks(convertRubyToHtml(line));
+					// ルビ指定をHTMLの<ruby>に変換する
+					// <p>タグを<main>に投入する
+					pElement.innerHTML = line;
+					currentElement.appendChild(pElement);
+				}
+			} else {
+				currentElement.appendChild(document.createElement('br'));
+			}
+		});
+		if (isMainContents) {
+			mainRowCount = rowNumber;
+		}
+	});
+	document.querySelector('h1').innerText = document.querySelector('meta[name="DC.Title"]').content;
+	document.querySelector('.author').innerText = document.querySelector('meta[name="author"]').content;
+
+	const dlElement = document.createElement('dl');
+	const fotterDcs = {
+		'DC.Rights': '権利',
+		'DC.Contributor': '訳者（機械翻訳による）',
+		'DC.Description': '説明',
+		'DC.Date': '最終更新日',
+		'DC.Relation': '関係資料'
+	};
+
+	const footerElement = document.querySelector('footer');
+	footerElement.appendChild(document.createElement('br'));
+
+	for (const [key, value] of Object.entries(fotterDcs)) {
+		const dtElement = document.createElement('dt');
+		const ddElement = document.createElement('dd');
+		dtElement.id = key + '-title';
+		dtElement.innerHTML = value;
+		ddElement.id = key + '-document';
+		ddElement.innerHTML = convertUrlsToLinks(document.querySelector(`meta[name='${key}']`).content);
+		dlElement.appendChild(dtElement);
+		dlElement.appendChild(ddElement);
+		footerElement.appendChild(dlElement);
+	}
+
+	// 現在表示されている吹き出しの要素
+	let currentOpenTooltip = null;
+
+	// その他の要素がクリックされた時のイベントリスナー
+	document.addEventListener('click', (event) => {
+
+		// クリックイベントがbodyまで伝播するのを防ぐ
+		event.stopPropagation();
+
+		// 現代語訳された要素をタップ(クリック)された時、吹き出しに原文を表示させる処理。
+		if (event.target.classList.contains('translated-text')) {
+			const targetId = event.target.dataset.originalTarget;
+			const tooltipContent = document.getElementById(targetId);
+
+			if (!tooltipContent) {
+				console.error(`Error: Tooltip content with ID '${targetId}' not found.`);
+				return;
+			}
+
+			// すでに別の吹き出しが表示されている場合は非表示にする
+			if (currentOpenTooltip && currentOpenTooltip !== tooltipContent) {
+				currentOpenTooltip?.classList?.remove('show');
+			}
+
+			// 吹き出しの表示/非表示を切り替える
+			if (tooltipContent.classList.contains('show')) {
+				tooltipContent?.classList?.remove('show');
+				currentOpenTooltip = null;
+			} else {
+				tooltipContent.classList.add('show');
+				currentOpenTooltip = tooltipContent;
+
+				// 吹き出しの位置を計算して設定
+				positionTooltip(event.target, tooltipContent);
+
+				// メニューを閉じる
+				if (customContextMenuElement.style.display === 'block') {
+					customContextMenuElement.style.display = 'none';
+					currentTargetElement = null;
+				}
+			}
+		} else {
+			// 吹き出し外をクリックしたら非表示にする
+			if (currentOpenTooltip) {
+				currentOpenTooltip?.classList?.remove('show');
+				currentOpenTooltip = null;
+			}
+		}
+
+		// クリックされた場所がメニュー内ではない、かつメニューが表示されている場合、メニューを非表示にする
+		if (customContextMenuElement.style.display === 'block' && !(customContextMenuElement.contains(event.target))) {
+			customContextMenuElement.style.display = 'none';
+			currentTargetElement = null;
+		}
+
+		// ブックマーク要素がクリックされた時の処理
+		const taragetBookmarkElement = event.target.closest('.bookmark');
+		if (taragetBookmarkElement) {
+			// 親要素の左端の座標範囲を計算
+			const pseudoElementScreenLeft = taragetBookmarkElement.getBoundingClientRect().left;
+			// クリック座標が親要素の左側にあるか判定
+			if (
+				event.clientX <= pseudoElementScreenLeft
+			) {
+				// ::before 要素クリック時はブックマークを解除する。
+				taragetBookmarkElement.classList.remove('bookmark');
+				// 'bookmark'クラスの操作の後、ブックマーク行番号を取得して更新する
+				bookmarkRows = getBookmarkRows();
+				// ブックマークリストをローカルストレージに保存する
+				localStorage.setItem("aozoraModernJapaneseTranslation_BookmarkRows", bookmarkRows.join(','));
+			}
+		}
+	});
+
+	// リサイズ時にも吹き出しの位置を調整 (すでに表示されている場合)
+	window.addEventListener('resize', () => {
+		if (currentOpenTooltip) {
+			const triggerId = currentOpenTooltip.id;
+			const correspondingTrigger = document.querySelector(`[data-original-target='${triggerId}']`);
+			if (correspondingTrigger) {
+				positionTooltip(correspondingTrigger, currentOpenTooltip);
+			}
+		}
+	});
+
+	// feature-content.html の読み込み完了を待機
+	await loadFeatureContent;
+
+	/** コンテキストメニュー要素の取得 */
+	const customContextMenuElement = document.getElementById('customContextMenu');
+
+	/** コンテキストメニューのターゲット要素 */
+	let currentTargetElement = null;
+
+	/** コンテキストメニューキーが押されているか */
+	let isTriggeredByKeyboardContextMenuKey = false;
+
+	// contextmenu イベントリスナー (右クリック/長押し)
+	document.body.addEventListener('contextmenu', (event) => {
+		// デフォルトのコンテキストメニューを抑制
+		event.preventDefault();
+
+		let clientX, clientY;
+		let target = event.target;
+
+		// コンテキストメニューキーが押されているか
+		if (isTriggeredByKeyboardContextMenuKey) {
+			// コンテキストメニューキーが押されている場合、
+			// マウス位置をグローバル変数から取得する
+			clientX = mousePosition.x;
+			clientY = mousePosition.y;
+			// 要素もマウス位置を基準に取得する
+			target = document.elementFromPoint(mousePosition.x, mousePosition.y);
+			isTriggeredByKeyboardContextMenuKey = false;
+		} else {
+			// コンテキストメニューキーが押されていない（右クリックやタップの）場合、
+			// マウス位置をイベント変数から取得する
+			clientX = event.clientX;
+			clientY = event.clientY;
+		}
+
+		// 既存のメニューが表示されていれば非表示にする
+		if (customContextMenuElement.style.display === 'block') {
+			customContextMenuElement.style.display = 'none';
+		}
+
+		// メニューを表示する
+		customContextMenuElement.style.display = 'block';
+
+		// メニュー項目(アイテム)の表示/非表示切り替え
+		const listItemBookmarkSetUnSetElement = customContextMenuElement.querySelector('li[data-action="bookmark-set-un-set"]');
+		if (target.id.indexOf('row-') !== -1) {
+			// Main > 本文 の 要素であればブックマークボタンを表示する。
+			listItemBookmarkSetUnSetElement.style.display = 'block';
+			if (target.classList.contains('bookmark')) {
+				// ブックマーク済みの時は、青色ブックマークを表示する
+				listItemBookmarkSetUnSetElement.querySelector('img').src = './img/bookmark-blue.svg';
+			} else {
+				// ブックマークしていない時は、黒色ブックマークを表示する
+				listItemBookmarkSetUnSetElement.querySelector('img').src = './img/bookmark.svg';
+			}
+		} else {
+			// Main > 本文 の 要素で無ければブックマークボタンを非表示にする。
+			listItemBookmarkSetUnSetElement.style.display = 'none';
+		}
+
+		// 文字サイズ
+		const fontSizePx = parseFloat(window.getComputedStyle(customContextMenuElement).fontSize);
+
+		// メニューの位置を設定
+		// スクロール位置を考慮してドキュメント基準のY座標を計算
+		// window.scrollY は現在のドキュメントの垂直方向のスクロール量
+		let posX = clientX + window.scrollX - fontSizePx * 2;
+		let posY = clientY + window.scrollY + fontSizePx;
+
+		// 画面の端からはみ出さないように調整
+		const menuWidth = customContextMenuElement.offsetWidth;
+		const menuHeight = customContextMenuElement.offsetHeight;
+		const viewportWidth = window.innerWidth;
+		const viewportHeight = window.innerHeight;
+
+		// スクロールバーを含まないビューポートの右端・下端を基準に調整する
+		// clientX/Yはスクロールの影響を受けないので、調整ロジックもそのままclient*を使用
+		if (clientX + menuWidth > viewportWidth) {
+			posX = viewportWidth - menuWidth - 5 + window.scrollX;
+		}
+		if (clientY + menuHeight > viewportHeight) {
+			posY = viewportHeight - menuHeight - 5 + window.scrollY;
+		}
+
+		// 画面左端・上端からはみ出し防止
+		if (posX < window.scrollX) posX = window.scrollX;
+		if (posY < window.scrollY) posY = window.scrollY;
+
+		customContextMenuElement.style.left = `${posX}px`;
+		customContextMenuElement.style.top = `${posY}px`;
+
+		// 現在メニューが表示されているターゲットを記録
+		currentTargetElement = target;
+	});
+
+	// メニュー項目がクリックされた時の処理
+	customContextMenuElement.addEventListener('click', (event) => {
+		const action = event.target.closest('li[data-action]').dataset.action;
+		if (action) {
+			if (action === 'share-to-twitter') {
+				// ページ遷移はボタンに直接クリックイベントを割り当てて対応
+				// メニューは閉じない
+				return;
+			} else if (action === 'bookmark-set-un-set') {
+				if (currentTargetElement.classList.contains('bookmark')) {
+					currentTargetElement.classList.remove('bookmark');
+				} else {
+					currentTargetElement.classList.add('bookmark');
+				}
+				// 'bookmark'クラスの操作の後、ブックマーク行番号を取得して更新する
+				bookmarkRows = getBookmarkRows();
+				// ブックマークリストをローカルストレージに保存する
+				localStorage.setItem("aozoraModernJapaneseTranslation_BookmarkRows", bookmarkRows.join(','));
+			} else if (action === 'bookmark-list-open') {
+				// ブックマークリスト表示
+				// メニューは閉じない
+				popupBookmarkListsModal();
+				return;
+			} else if (action === 'close') {
+				// 明示的に閉じるボタンが押された場合
+			} else {
+				// 設定されていないボタンが押された場合
+			}
+		}
+		// クリック後にメニューを非表示
+		customContextMenuElement.style.display = 'none';
+		currentTargetElement = null;
+	});
+
+	// Twitterへ共有するボタンが押下された時のイベントリスナー
+	document.getElementById('shareToTwitter').addEventListener('click', () => {
+		const anker = currentTargetElement.id ? '#' + currentTargetElement.id : '';
+		const pageUrl = encodeURIComponent(window.location.origin + window.location.pathname + anker);
+		let rowNumber = 0;
+		const lastRowStringIndex = currentTargetElement.id.lastIndexOf('row-');
+		if (lastRowStringIndex >= 0) {
+			rowNumber = Number(currentTargetElement.id.substring(lastRowStringIndex + 4)) || 0;
+		}
+		let pageText = document.querySelector('title').innerHTML;
+		if (rowNumber) {
+			pageText += ` を ${(rowNumber / mainRowCount * 100).toFixed(1)}% まで読みました。`;
+		} else {
+			pageText += ` を読みました。`;
+		}
+		pageText = encodeURIComponent(pageText);
+		const shareUrl = `https://twitter.com/intent/tweet?url=${pageUrl}&text=${pageText}`;
+
+		window.open(shareUrl, '_blank', 'noopener,noreferrer');
+	});
+
+	// キーボード押下時のイベントリスナー
+	document.addEventListener('keydown', (event) => {
+		// Escapeキー押下で開いているものを閉じる
+		if (event.key === 'Escape') {
+			// メニューを非表示
+			if (customContextMenuElement.style.display === 'block') {
+				customContextMenuElement.style.display = 'none';
+				currentTargetElement = null;
+			}
+			currentOpenTooltip?.classList?.remove('show');
+			currentOpenTooltip = null;
+			// モーダルを閉じる
+			closeModal();
+		} else if (event.altKey && (event.key === 'b' || event.key === 'B')) {
+			// alt + b 		... 一覧表示 (next)
+			// 次のブックマークにジャンプ
+			nextBookmarkJump();
+			// ブックマークリスト表示
+			popupBookmarkListsModal();
+		} else if (event.shiftKey && (event.key === 'b' || event.key === 'B')) {
+			// shift + b 	... 一覧表示 (prev)
+			// 前のブックマークにジャンプ
+			nextBookmarkJump(true);
+			// ブックマークリスト表示
+			popupBookmarkListsModal();
+		} else if (event.key === 'b') {
+			// b 			... ブックマーク on/off
+			// その座標にある最上位の要素を取得
+			const underCursorElement = document.elementFromPoint(document.querySelector('main').getBoundingClientRect().left, mousePosition.y);
+			if (underCursorElement && underCursorElement.closest('main') && underCursorElement.id.indexOf('row-') !== -1) {
+				// 本文の文書の要素取得時のみ処理する
+				if (underCursorElement.classList.contains('bookmark')) {
+					underCursorElement.classList.remove('bookmark');
+				} else {
+					underCursorElement.classList.add('bookmark');
+				}
+				// 'bookmark'クラスの操作の後、ブックマーク行番号を取得して更新する
+				bookmarkRows = getBookmarkRows();
+				// ブックマークリストをローカルストレージに保存する
+				localStorage.setItem("aozoraModernJapaneseTranslation_BookmarkRows", bookmarkRows.join(','));
+			}
+		} else if (event.key === 'ContextMenu') {
+			isTriggeredByKeyboardContextMenuKey = true;
+		}
+	});
+
+	/** 次のブックマークへジャンプする */
+	let bookmarkRowsIndex = -1;
+	const nextBookmarkJump = (isPrev = false) => {
+		if (bookmarkRows.length >= 2) {
+			if (!(bookmarkListsModal) || bookmarkListsModal.style.display === 'none') {
+				// ブックマークモーダルウィンドウ非表示の時はマウス位置を基準に前後のブックマーク位置に移動する
+				const underCursorElement = document.elementFromPoint(document.querySelector('main').getBoundingClientRect().left, mousePosition.y);
+				if (underCursorElement && underCursorElement.closest('main') && underCursorElement.id.indexOf('row-') !== -1) {
+					const lastRowStringIndex = underCursorElement.id.lastIndexOf('row-');
+					const currentRowNumber = Number(underCursorElement.id.substring(lastRowStringIndex + 4)) || 0;
+
+					for (const [index, rowNumber] of bookmarkRows.entries()) {
+						if (currentRowNumber === rowNumber) {
+							jumpToRowNumber(rowNumber);
+							bookmarkRowsIndex = index;
+							break;
+						} else if (currentRowNumber <= rowNumber) {
+							bookmarkRowsIndex = index;
+							if (isPrev) {
+								// 前のブックマークにジャンプ (アンダーフローした場合末尾のブックマークにジャンプする)
+								jumpToRowNumber(bookmarkRows.at(--bookmarkRowsIndex));
+							} else {
+								// 次のブックマークにジャンプ
+								jumpToRowNumber(rowNumber);
+							}
+							break;
+						}
+					}
+				} else {
+					if (isPrev) {
+						// 末尾のブックマークにジャンプする
+						jumpToRowNumber(bookmarkRows.at(-1));
+						bookmarkRowsIndex = bookmarkRows.length - 1;
+					} else {
+						// 先頭のブックマークにジャンプ
+						jumpToRowNumber(bookmarkRows.at(0));
+						bookmarkRowsIndex = 0;
+					}
+				}
+			} else {
+				if (bookmarkRowsIndex === -1) { bookmarkRowsIndex = 0; }
+				// ブックマークモーダルウィンドウ表示している時は、前回のブックマークから前後のブックマーク位置に移動する
+				if (isPrev) {
+					// 前のブックマークにジャンプ (アンダーフローした場合末尾のブックマークにジャンプする)
+					if (--bookmarkRowsIndex < 0) {
+						bookmarkRowsIndex = bookmarkRows.length + bookmarkRowsIndex;
+					}
+				} else {
+					// 次のブックマークにジャンプ
+					if (++bookmarkRowsIndex > bookmarkRows.length - 1) {
+						bookmarkRowsIndex = bookmarkRowsIndex - bookmarkRows.length;
+					}
+				}
+				jumpToRowNumber(bookmarkRows.at(bookmarkRowsIndex));
+			}
+		} else if (bookmarkRows.length === 1) {
+			jumpToRowNumber(bookmarkRows[0]);
+		}
+	}
+
+	/** 指定行番号にジャンプする */
+	const jumpToRowNumber = (rowNumber) => {
+		const targetRow = document.getElementById(`translated-row-${rowNumber}`) ?? document.getElementById(`row-${rowNumber}`);
+		if (targetRow) { jumpToId(targetRow.id); }
+	}
+
+	/** 指定ID位置にジャンプする */
+	const jumpToId = (id) => {
+		const anker = id ? '#' + id : '';
+		window.location.href = window.location.pathname + anker;
+	}
+
+	/** マウスカーソルの座標 */
+	const mousePosition = { x: 0, y: 0 };
+
+	// mousemove イベントリスナーに追加
+	document.addEventListener('mousemove', (event) => {
+		// 常にマウスカーソルの位置を更新する
+		mousePosition.x = event.clientX;
+		mousePosition.y = event.clientY;
+	});
+
+	/** ブックマークモーダルウィンドウの要素 */
+	const bookmarkListsModal = document.getElementById('bookmarkListsModal');
+	/** ブックマークモーダルウィンドウ閉じるボタン */
+	const bookmarkListsModalCloseButton = bookmarkListsModal.querySelector('.close-button');
+	/** ブックマークリスト表示欄 */
+	const bookmarkList = document.getElementById('bookmarkList');
+	/** 目次リスト表示欄 */
+	const indexList = document.getElementById('indexList');
+
+	/** ブックマークが無い時に表示する用リストアイテム */
+	const noBookmarkLi = document.createElement('li');
+	noBookmarkLi.textContent = 'ブックマークがありません。';
+	noBookmarkLi.style.cursor = 'default';
+	noBookmarkLi.style.textAlign = 'center';
+	noBookmarkLi.style.color = '#777';
+	noBookmarkLi.style.backgroundColor = 'transparent';
+
+	/** 目次が無い時に表示する用リストアイテム */
+	const noIndexLi = noBookmarkLi.cloneNode(false);
+	noIndexLi.textContent = '参照できる章がありません。';
+
+	/** ブックマークモーダルウィンドウの表示をする */
+	const popupBookmarkListsModal = () => {
+		// ブックマークモーダルウィンドウの表示
+		bookmarkListsModal.style.display = 'flex';
+
+		/** 項目がクリックされた時、該当位置にジャンプする */
+		const clickFunction = (id) => {
+			// ブックマーク位置に移動
+			jumpToId(id);
+			// モーダルを閉じる
+			closeModal();
+			// メニューを非表示
+			if (customContextMenuElement.style.display === 'block') {
+				customContextMenuElement.style.display = 'none';
+				currentTargetElement = null;
+			}
+			currentOpenTooltip?.classList?.remove('show');
+			currentOpenTooltip = null;
+		}
+
+		// ブックマークリストをクリア
+		bookmarkList.innerHTML = '';
+		if (bookmarkRows.length) {
+			// ブックマークリストを画面に表示する
+			bookmarkRows.forEach((rowNumber, index) => {
+				const listItem = document.createElement('li');
+				const targetRow = document.getElementById(`translated-row-${rowNumber}`) ?? document.getElementById(`row-${rowNumber}`);
+				if (targetRow) {
+					listItem.innerHTML = `${rowNumber} : ${targetRow.innerText}`;
+					if (index === bookmarkRowsIndex) {
+						listItem.classList.add('primary');
+					}
+					bookmarkList.appendChild(listItem);
+
+					// リスト項目がクリックされた時の処理
+					listItem.addEventListener('click', () => {
+						clickFunction(targetRow.id);
+					});
+				}
+			});
+		} else {
+			// ブックマークが無い時用の表示をする
+			bookmarkList.appendChild(noBookmarkLi);
+		}
+
+		// 目次リストをクリア
+		indexList.innerHTML = '';
+		const indexRowElements = document.querySelectorAll('main h2:not(.original-text)');
+		if (indexRowElements.length) {
+			// 目次リストを画面に表示する
+			indexRowElements.forEach(targetElement => {
+				const listItem = document.createElement('li');
+				if (targetElement) {
+					listItem.innerHTML = `${targetElement.innerHTML}`;
+					indexList.appendChild(listItem);
+
+					// リスト項目がクリックされた時の処理
+					listItem.addEventListener('click', () => {
+						clickFunction(targetElement.id);
+					});
+				}
+			});
+		} else {
+			// 目次が無い時用の表示をする
+			indexList.appendChild(noIndexLi);
+		}
+	}
+
+	/** モーダルウィンドウを閉じる */
+	const closeModal = () => {
+		bookmarkListsModal.style.display = 'none';
+	}
+
+	// イベントリスナーの設定
+	bookmarkListsModalCloseButton.addEventListener('click', closeModal);
+
+	// モーダルコンテンツ以外をクリックした時、モーダルウィンドウを閉じる
+	bookmarkListsModal.addEventListener('click', (event) => {
+		if (event.target === bookmarkListsModal) {
+			closeModal();
+		}
+	});
+});
