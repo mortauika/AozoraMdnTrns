@@ -1,4 +1,4 @@
-﻿head,
+﻿html,
 body {
     margin: 0;
     padding: 0;
@@ -8,12 +8,20 @@ body {
     /* 横書き */
     writing-mode: horizontal-tb;
     padding: 3em;
-    font-size: 1rem;
+    font-size: 1em;
     font-family: "YuMincho", "Yu Mincho", "游明朝", YuMincho, "ヒラギノ明朝 ProN W3", "HiraMinProN-W3", "ＭＳ 明朝", "MS Mincho", serif;
     font-weight: 500;
     line-height: 1.5;
     /* メニュー外クリックのための最小高さ */
     min-height: 100vh;
+}
+
+/* 縦長の場合、縦長用のレイアウトでオーバーライドする */
+@media screen and (orientation: portrait) {
+    body {
+        font-size: 4vw;
+        padding: 1em;
+    }
 }
 
 header {
@@ -45,7 +53,7 @@ h6 {
     border: 1px rgb(191, 191, 191) solid;
     margin: 1em 0 0 0;
     padding: 0.5em 0;
-    font-size: 1rem;
+    font-size: 1em;
     font-weight: 500;
     line-height: 1.5;
 }
@@ -127,7 +135,7 @@ footer a {
     display: inline-block;
     max-width: 100%;
     word-break: break-all;
-    overflow-wrap: break-word; 
+    overflow-wrap: break-word;
 }
 
 /* カスタムメニューのスタイル */
@@ -192,12 +200,12 @@ footer a {
 /* モーダルのコンテンツボックス */
 .modal-content {
     background-color: white;
-    padding: 1rem 1rem 0 1rem;
-    border-radius: 0.5rem;
-    box-shadow: 0 0.1rem 1rem rgba(0, 0, 0, 1);
+    padding: 1em 1em 0 1em;
+    border-radius: 0.5em;
+    box-shadow: 0 0.1em 1em rgba(0, 0, 0, 1);
     width: 50vw;
-    min-width: 15rem;
-    max-width: 40rem;
+    min-width: 15em;
+    max-width: 40em;
     /* 最大幅を設定 */
     position: relative;
     box-sizing: border-box;
@@ -205,18 +213,18 @@ footer a {
 }
 
 .modal-content h2 {
-    padding: 0.25rem 0.2rem 0.25rem 0.75rem;
+    padding: 0.25em 0.2em 0.25em 0.75em;
 }
 
 /* モーダルの閉じるボタン */
 .modal-content .close-button {
     position: absolute;
-    border-radius: 1.25rem;
-    padding: 0.25rem;
-    top: 0.25rem;
-    right: 0.25rem;
-    width: 2.5rem;
-    height: 2.5rem;
+    border-radius: 1.25em;
+    padding: 0.25em;
+    top: 0.25em;
+    right: 0.25em;
+    width: 2.5em;
+    height: 2.5em;
     cursor: pointer;
     display: flex;
     background-color: #fff;
@@ -238,8 +246,8 @@ footer a {
     /* リストの点などを消す */
     list-style: none;
     padding: 0;
-    margin-top: 1rem;
-    margin-bottom: 2rem;
+    margin-top: 1em;
+    margin-bottom: 2em;
     /* リストの高さ制限 */
     max-height: 25vh;
     /* 高さ制限を超えたらスクロール */
@@ -249,11 +257,11 @@ footer a {
 
 .modal-list h2,
 .modal-list li {
-    font-size: 1.1rem;
+    font-size: 1.1em;
 }
 
 .modal-list li {
-    padding: 0.25rem 0.2rem;
+    padding: 0.25em 0.2em;
     border-bottom: 1px solid #eee;
     cursor: pointer;
     transition: background-color 0.2s ease;

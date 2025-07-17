@@ -6,8 +6,26 @@
 	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
 	<title>青空文庫 現代語訳版 掲載ページ</title>
 	<style>
+		html,
+		body {
+			margin: 0;
+			padding: 0;
+		}
+
 		body {
 			font-family: "YuMincho", "Yu Mincho", "游明朝", YuMincho, "ヒラギノ明朝 ProN W3", "HiraMinProN-W3", "ＭＳ 明朝", "MS Mincho", serif;
+			padding: 1em;
+		}
+
+		/* 縦長の場合、縦長用のレイアウトでオーバーライドする */
+		@media screen and (orientation: portrait) {
+			body {
+				font-size: 5vw;
+			}
+
+			h1 {
+				font-size: 6vw;
+			}
 		}
 	</style>
 </head>
