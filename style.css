@@ -123,6 +123,13 @@ p.bookmark::after {
     /* IE対応 */
 }
 
+footer a {
+    display: inline-block;
+    max-width: 100%;
+    word-break: break-all;
+    overflow-wrap: break-word; 
+}
+
 /* カスタムメニューのスタイル */
 .custom-context-menu {
     position: absolute;
