@@ -8,24 +8,37 @@ body {
     /* 横書き */
     writing-mode: horizontal-tb;
     padding: 3em;
-    font-size: 1em;
     font-family: "YuMincho", "Yu Mincho", "游明朝", YuMincho, "ヒラギノ明朝 ProN W3", "HiraMinProN-W3", "ＭＳ 明朝", "MS Mincho", serif;
     font-weight: 500;
     line-height: 1.5;
     /* メニュー外クリックのための最小高さ */
     min-height: 100vh;
+    background-color: #f8f8f8;
+    color: #333;
 }
 
-/* 縦長の場合、縦長用のレイアウトでオーバーライドする */
-@media screen and (orientation: portrait) {
-    body {
-        font-size: 4vw;
-        padding: 1em;
-    }
+body.size1 {
+    font-size: 0.5rem;
+}
+
+body.size2 {
+    font-size: 0.7rem;
+}
+
+body.size3 {
+    font-size: 1rem;
+}
+
+body.size4 {
+    font-size: 1.4rem;
+}
+
+body.size5 {
+    font-size: 2rem;
 }
 
 header {
-    margin-bottom: 3em;
+    margin-bottom: 3rem;
 }
 
 footer {
@@ -45,12 +58,16 @@ main>pre {
     white-space: pre-wrap;
 }
 
+main>pre.original-pre {
+    display: none;
+}
+
 h2,
 h3,
 h4,
 h5,
 h6 {
-    border: 1px rgb(191, 191, 191) solid;
+    border: 1px #bfbfbf solid;
     margin: 1em 0 0 0;
     padding: 0.5em 0;
     font-size: 1em;
@@ -76,7 +93,7 @@ p.original-text {
     z-index: 1000;
     background-color: #406d65;
     color: #fff;
-    box-shadow: 0.2em 0.4em 0.5em rgba(0, 0, 0, 0.7);
+    box-shadow: 0.2em 0.4em 0.5em #000000b3;
 }
 
 .original-text.show {
@@ -99,6 +116,14 @@ p.bookmark::before {
     left: -2em;
 }
 
+h2.bookmark,
+p.bookmark {
+    border: solid #008BDB;
+    border-width: 0 0 0 0.2em;
+    margin-left: -0.4em;
+    padding: 0 0 0 0.2em;
+}
+
 h2.bookmark::after,
 p.bookmark::after {
     content: "";
@@ -106,29 +131,6 @@ p.bookmark::after {
     width: 0;
     height: 0;
     clear: both;
-}
-
-.target-box {
-    width: 300px;
-    height: 150px;
-    background-color: #e0f7fa;
-    border: 2px dashed #00bcd4;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    text-align: center;
-    padding: 20px;
-    margin: 50px auto;
-    font-size: 1.1em;
-    color: #00796b;
-    cursor: context-menu;
-    /* コンテキストメニューが利用可能であることを示唆 */
-    user-select: none;
-    /* テキスト選択を無効にする (長押し対策) */
-    -webkit-user-select: none;
-    /* Safari対応 */
-    -ms-user-select: none;
-    /* IE対応 */
 }
 
 footer a {
@@ -143,28 +145,27 @@ footer a {
     position: absolute;
     background-color: #fff;
     border: 1px solid #ddd;
-    /* border-radius: 1em; */
-    box-shadow: 0.25em 0.5em rgba(0, 0, 0, 0.2);
+    border-radius: 1em;
+    box-shadow: 0.25em 0.5em #00000033;
     z-index: 1000;
     min-width: 150px;
-    display: none;
     /* 初期状態では非表示 */
+    display: none;
 }
 
 .custom-context-menu ul {
     display: flex;
     flex: column;
     list-style: none;
-    /* border-radius: 1em; */
     padding: 0.5em;
     margin: 0;
 }
 
 .custom-context-menu li {
     padding: 0.5em;
-    /* border-radius: 0.5em; */
     cursor: pointer;
     aspect-ratio: 1 / 1;
+    border-radius: 0.75em;
 }
 
 .custom-context-menu li img {
@@ -191,7 +192,7 @@ footer a {
     left: 0;
     width: 100%;
     height: 100%;
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: #000000b3;
     justify-content: center;
     align-items: center;
     z-index: 10000;
@@ -202,18 +203,13 @@ footer a {
     background-color: white;
     padding: 1em 1em 0 1em;
     border-radius: 0.5em;
-    box-shadow: 0 0.1em 1em rgba(0, 0, 0, 1);
+    box-shadow: 0 0.1em 1em #000000;
     width: 50vw;
     min-width: 15em;
     max-width: 40em;
-    /* 最大幅を設定 */
     position: relative;
     box-sizing: border-box;
-    /* paddingを含めてwidthを計算 */
-}
-
-.modal-content h2 {
-    padding: 0.25em 0.2em 0.25em 0.75em;
+    font-size: 1.1em;
 }
 
 /* モーダルの閉じるボタン */
@@ -241,6 +237,15 @@ footer a {
     fill: #333;
 }
 
+.modal-content h2 {
+    padding: 0.25em 0.2em 0.25em 0.75em;
+}
+
+.modal-content h2,
+.modal-content .modal-list {
+    border: 1px solid #eee;
+}
+
 /* モーダルリストのスタイル */
 .modal-list {
     /* リストの点などを消す */
@@ -252,17 +257,10 @@ footer a {
     max-height: 25vh;
     /* 高さ制限を超えたらスクロール */
     overflow-y: auto;
-    border: 1px solid #eee;
-}
-
-.modal-list h2,
-.modal-list li {
-    font-size: 1.1em;
 }
 
 .modal-list li {
     padding: 0.25em 0.2em;
-    border-bottom: 1px solid #eee;
     cursor: pointer;
     transition: background-color 0.2s ease;
     white-space: nowrap;
@@ -270,8 +268,13 @@ footer a {
     text-overflow: ellipsis;
 }
 
+.modal-list li {
+    border: 0;
+    border-bottom: 1px solid #eee;
+}
+
 .modal-list li.primary {
-    background-color: lightblue;
+    background-color: #add8e6;
 }
 
 .modal-list li:last-child {
@@ -280,4 +283,143 @@ footer a {
 
 .modal-list li:hover {
     background-color: #f0f0f0;
+}
+
+/* 本文変更ウィンドウのスタイル */
+#editSentenceModal>.modal-content {
+    max-width: 90vw;
+}
+
+#editSentenceModal #editSentenceArea {
+    margin: 1em 0;
+    padding: 0.25em;
+    background-color: #d2e0ec;
+}
+
+#editSentenceModal #editSentenceModalButtons {
+    margin-bottom: 1em;
+    display: flex;
+    flex-direction: row;
+    justify-content: flex-end;
+}
+
+#editSentenceModal #editSentenceModalButtons button {
+    margin: 0 0 0 0.5em;
+    padding: 0.25em 1em;
+    border: 1px solid #ddd;
+    background: none;
+    font-family: inherit;
+    font-size: inherit;
+    color: inherit;
+}
+
+#editSentenceModal #editSentenceModalButtons button:hover {
+    background-color: #ddd;
+}
+
+#editSentenceModal #editSentenceModalButtons button:active {
+    background-color: #d2e0ec;
+}
+
+/* 縦長の場合、縦長用のレイアウトでオーバーライドする */
+@media screen and (orientation: portrait) {
+    body {
+        font-size: 4vw;
+        padding: 1em;
+    }
+
+    body.size1 {
+        font-size: 3vw;
+    }
+
+    body.size2 {
+        font-size: 3.5vw;
+    }
+
+    body.size3 {
+        font-size: 4vw;
+    }
+
+    body.size4 {
+        font-size: 5vw;
+    }
+
+    body.size5 {
+        font-size: 6.5vw;
+    }
+
+    h2.bookmark::before,
+    p.bookmark::before {
+        width: 0;
+        height: 0;
+        background: none;
+        clear: both;
+        position: relative;
+    }
+
+    h2.bookmark,
+    p.bookmark {
+        border: solid #008BDB;
+        border-width: 0 0 0 0.5em;
+        margin-left: -1em;
+        padding: 0 0 0 0.5em;
+    }
+}
+
+/* ダークモードの場合の色設定 */
+@media (prefers-color-scheme: dark) {
+    a {
+        color: #8cf;
+    }
+
+    /* モーダルのコンテンツボックス */
+    body,
+    .modal-content,
+    .modal-content .close-button {
+        background-color: #1a1a1a;
+        color: #f0f0f0;
+    }
+
+    .close-button:hover {
+        background-color: #404c50;
+    }
+
+    .close-button:hover>svg {
+        fill: #58747e;
+    }
+
+    .modal-content h2,
+    .modal-content .modal-list {
+        border: 1px solid #363636;
+    }
+
+    .modal-list li {
+        border: 0;
+        border-bottom: 1px solid #363636;
+    }
+
+    .modal-list li.primary {
+        background-color: darkslategray;
+    }
+
+    .modal-list li:hover {
+        background-color: #404c50;
+    }
+
+    #editSentenceModal #editSentenceArea {
+        background-color: #42576b;
+    }
+
+    #editSentenceModal #editSentenceModalButtons button {
+        border: 1px solid #363636;
+    }
+
+    #editSentenceModal #editSentenceModalButtons button:hover {
+        background-color: #363636;
+    }
+
+    #editSentenceModal #editSentenceModalButtons button:active {
+        background-color: #42576b;
+    }
+
 }
