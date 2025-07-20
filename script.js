@@ -269,13 +269,13 @@ document.addEventListener('DOMContentLoaded', async function () {
 			const rowNumber = index + 1;
 			const originalLine = originalLines[index];
 			const translatedLine = translatedLines[index];
-			if (originalLine === translatedLine && originalLine === '' && translatedLine === '') {
+			if (originalLine === translatedLine && originalLine === '' && translatedLine === '' && (rowNumber in modRows) === false) {
 				// 空白行は<br>タグ追加
 				currentElement.appendChild(document.createElement('br'));
 			} else {
 				let idList = [];
 				const lineList = [originalLine, translatedLine];
-				if (originalLine === translatedLine && rowNumber in modRows === false) {
+				if (originalLine === translatedLine && (rowNumber in modRows) === false) {
 					// 新旧で差異が無い行
 					idList = [`row-${rowNumber}`];
 				} else {
@@ -283,7 +283,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 				}
 				idList.forEach((id, index) => {
 					let line = lineList[index];
-					if (index && rowNumber in modRows) {
+					if (index && (rowNumber in modRows)) {
 						// translated-text 現代語訳の時かつ、該当行の変更がされている場合は、
 						// 変更文の内容で書き換える
 						line = modRows[rowNumber];
