@@ -238,7 +238,7 @@ bookmarkRows = (localStorage.getItem('aozoraModernJapaneseTranslation_BookmarkRo
 	.split(',').map(row => row ? Number(row) : null).filter(number => number !== null);
 
 // ローカルストレージ変更内容を読み込む
-modRows = JSON.parse(localStorage.getItem('aozoraModernJapaneseTranslation_modRows'));
+modRows = JSON.parse(localStorage.getItem('aozoraModernJapaneseTranslation_modRows')) ?? {};
 
 // 起動時ドキュメント読み込み後の処理
 document.addEventListener('DOMContentLoaded', async function () {
