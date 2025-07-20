@@ -283,7 +283,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 				}
 				idList.forEach((id, index) => {
 					let line = lineList[index];
-					if (index === 0 && rowNumber in modRows) {
+					if (index && rowNumber in modRows) {
+						// translated-text 現代語訳の時かつ、該当行の変更がされている場合は、
+						// 変更文の内容で書き換える
 						line = modRows[rowNumber];
 					}
 					// ［＃...は中見出し］ の 注釈を削除
