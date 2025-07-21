@@ -6,6 +6,8 @@
 		</li>
 		<li id="editSentence" data-action="edit-sentence" title="本文を変更する"><img
 				src="./img/iconmonstr-pencil-line-lined.svg" /></li>
+		<li id="modifiedListLoadOrSave" data-action="modified-list-load-or-save" title="変更リストの読み込みまたは保存"><img
+				src="./img/iconmonstr-download-19.svg" /></li>
 		<li id="shareToTwitter" data-action="share-to-twitter" title="Twitter（現X）に共有"><img
 				src="./img/iconmonstr-twitter-1.svg" /></li>
 		<li id="changeFontSize" data-action="change-font-size" title="文字サイズの変更"><img
@@ -49,3 +51,22 @@
 		</div>
 	</div>
 </div>
+<div id="commonMessageBoxModal" class="modal-overlay">
+	<div class="modal-content">
+		<div class="close-button">
+			<svg clip-rule="evenodd" fill-rule="evenodd" stroke-linejoin="round" stroke-miterlimit="2"
+				viewBox="0 0 24 24" fill="#aaa" xmlns="http://www.w3.org/2000/svg">
+				<path
+					d="m12 10.93 5.719-5.72c.146-.146.339-.219.531-.219.404 0 .75.324.75.749 0 .193-.073.385-.219.532l-5.72 5.719 5.719 5.719c.147.147.22.339.22.531 0 .427-.349.75-.75.75-.192 0-.385-.073-.531-.219l-5.719-5.719-5.719 5.719c-.146.146-.339.219-.531.219-.401 0-.75-.323-.75-.75 0-.192.073-.384.22-.531l5.719-5.719-5.72-5.719c-.146-.147-.219-.339-.219-.532 0-.425.346-.749.75-.749.192 0 .385.073.531.219z" />
+			</svg>
+		</div>
+		<h2></h2>
+		<div class="border-block"></div>
+		<div class="buttons-bar">
+			<button id="rollbackToOriginal">原文に戻す</button>
+			<button id="rollbackToTranslated">現代語訳に戻す</button>
+			<button id="editSentenceModalClose">閉じる</button>
+		</div>
+	</div>
+</div>
+<input type="file" id="editDataJsonFileInput" style="display: none;" />

@@ -237,13 +237,15 @@ footer a {
     fill: #333;
 }
 
-.modal-content h2 {
+.modal-content h2,
+.modal-content .border-block {
     padding: 0.25em 0.2em 0.25em 0.75em;
 }
 
 .modal-content h2,
+.modal-content .border-block,
 .modal-content .modal-list {
-    border: 1px solid #eee;
+    border: 1px solid #ddd;
 }
 
 /* モーダルリストのスタイル */
@@ -296,14 +298,22 @@ footer a {
     background-color: #d2e0ec;
 }
 
-#editSentenceModal #editSentenceModalButtons {
+#commonMessageBoxModal h2 {
+    margin: 0 0 1em 0;
+}
+
+#commonMessageBoxModal .border-block {
+    margin: 0 0 1em 0;
+}
+
+.buttons-bar {
     margin-bottom: 1em;
     display: flex;
     flex-direction: row;
     justify-content: flex-end;
 }
 
-#editSentenceModal #editSentenceModalButtons button {
+.buttons-bar button {
     margin: 0 0 0 0.5em;
     padding: 0.25em 1em;
     border: 1px solid #ddd;
@@ -313,11 +323,11 @@ footer a {
     color: inherit;
 }
 
-#editSentenceModal #editSentenceModalButtons button:hover {
+.buttons-bar button:hover {
     background-color: #ddd;
 }
 
-#editSentenceModal #editSentenceModalButtons button:active {
+.buttons-bar button:active {
     background-color: #d2e0ec;
 }
 
@@ -389,7 +399,8 @@ footer a {
     }
 
     .modal-content h2,
-    .modal-content .modal-list {
+    .modal-content .modal-list,
+    .modal-content .border-block {
         border: 1px solid #363636;
     }
 
@@ -410,15 +421,19 @@ footer a {
         background-color: #42576b;
     }
 
-    #editSentenceModal #editSentenceModalButtons button {
+    #commonMessageBoxModal .border-block {
         border: 1px solid #363636;
     }
 
-    #editSentenceModal #editSentenceModalButtons button:hover {
+    .buttons-bar button {
+        border: 1px solid #363636;
+    }
+
+    .buttons-bar button:hover {
         background-color: #363636;
     }
 
-    #editSentenceModal #editSentenceModalButtons button:active {
+    .buttons-bar button:active {
         background-color: #42576b;
     }
 

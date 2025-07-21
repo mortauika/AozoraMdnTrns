@@ -24,10 +24,14 @@ let customContextMenuElement;
 let bookmarkListsModalElement;
 /** 本文変更モーダルウィンドウの要素 */
 let editSentenceModalElement;
+/** 汎用メッセージボックスモーダルウィンドウの要素 */
+let commonMessageBoxModalElement;
+/** 編集内容のファイル読み込みボタンの要素 */
+let editDataJsonFileInputElement;
 /** mainの原文の文書 */
-let mainOriginalLines;
+let mainOriginalLines = [];
 /** mainの現代語訳の文書 */
-let mainTranslatedLines;
+let mainTranslatedLines = [];
 /** 変更行の連想配列 */
 let modRows = {};
 
@@ -228,17 +232,66 @@ async function loadHtmlFile(url, targetSelector) {
 	}
 }
 
+/**
+ * JSONファイルを保存(ダウンロード)する
+ * @param {string} filename ファイル名
+ * @param {string} jsonContent JSONデータ
+ */
+async function saveJson(filename, jsonContent) {
+	// Blobオブジェクトを作成
+	const blob = new Blob([jsonContent], { type: 'application/json;charset=utf-8' });
+	// Blobから一時的なURLを作成
+	const url = URL.createObjectURL(blob);
+	// ダウンロード用のa要素（リンク）を動的に作成
+	const a = document.createElement('a');
+	a.href = url;
+	// download属性にファイル名を指定
+	a.download = filename;
+	// ダウンロード用のAnkerタグを埋め込む
+	document.body.appendChild(a);
+	// Ankerクリックイベントを呼び出しファイルをダウンロードする。
+	a.click();
+	// ダウンロード用のAnkerタグを削除する
+	document.body.removeChild(a);
+	// Blobから一時的なURLを削除する
+	URL.revokeObjectURL(url);
+}
+
 // **** 起動時実行処理 ****
 
+/** HTMLファイル名（ローカルストレージ用） */
+const addFilename = '_' + window.location.pathname.split('/').pop().substring(0, window.location.pathname.lastIndexOf('.') - 1);
+{ // バージョン変更吸収 処理 // todo 8月に消す
+	const tmp_aozoraModernJapaneseTranslation_FontSize = localStorage.getItem(`aozoraModernJapaneseTranslation_fontsize`);
+	if (tmp_aozoraModernJapaneseTranslation_FontSize) {
+		localStorage.setItem(`aozoraModernJapaneseTranslation_FontSize_${addFilename}`, tmp_aozoraModernJapaneseTranslation_FontSize);
+		localStorage.removeItem(`aozoraModernJapaneseTranslation_fontsize`);
+	}
+	const tmp_aozoraModernJapaneseTranslation_BookmarkRows = localStorage.getItem(`aozoraModernJapaneseTranslation_BookmarkRows`);
+	if (tmp_aozoraModernJapaneseTranslation_BookmarkRows) {
+		localStorage.setItem(`aozoraModernJapaneseTranslation_BookmarkRows_${addFilename}`, tmp_aozoraModernJapaneseTranslation_BookmarkRows);
+		localStorage.removeItem(`aozoraModernJapaneseTranslation_BookmarkRows`);
+	}
+	const tmp_aozoraModernJapaneseTranslation_ModRows = localStorage.getItem(`aozoraModernJapaneseTranslation_modRows`);
+	if (tmp_aozoraModernJapaneseTranslation_ModRows) {
+		localStorage.setItem(`aozoraModernJapaneseTranslation_ModRows_${addFilename}`, tmp_aozoraModernJapaneseTranslation_ModRows);
+		localStorage.removeItem(`aozoraModernJapaneseTranslation_modRows`);
+	}
+}
+
 // ローカルストレージからフォントサイズを読み込み反映する
-document.body.classList.add(`size${Number(localStorage.getItem('aozoraModernJapaneseTranslation_fontsize') || 3)}`);
+document.body.classList.add(`size${Number(localStorage.getItem(`aozoraModernJapaneseTranslation_FontSize_${addFilename}`) || 3)}`);
 
 // ローカルストレージからブックマークリストを読み込む
-bookmarkRows = (localStorage.getItem('aozoraModernJapaneseTranslation_BookmarkRows') ?? '')
+bookmarkRows = (localStorage.getItem(`aozoraModernJapaneseTranslation_BookmarkRows_${addFilename}`) ?? '')
 	.split(',').map(row => row ? Number(row) : null).filter(number => number !== null);
 
 // ローカルストレージ変更内容を読み込む
-modRows = JSON.parse(localStorage.getItem('aozoraModernJapaneseTranslation_modRows')) ?? {};
+try {
+	modRows = JSON.parse(localStorage.getItem(`aozoraModernJapaneseTranslation_ModRows_${addFilename}`)) ?? {};
+} catch (error) {
+	console.error('JSONファイルのパース中にエラーが発生しました:', error);
+}
 
 // 起動時ドキュメント読み込み後の処理
 document.addEventListener('DOMContentLoaded', async function () {
@@ -248,17 +301,20 @@ document.addEventListener('DOMContentLoaded', async function () {
 	// mainタグとfooterタグの本文を配置する
 	mainElement = document.querySelector('main');
 	footerElement = document.querySelector('footer');
-	[mainElement, footerElement].forEach((currentElement, index) => {
+
+	/** 画面の状態を初期化する */
+	const displayInitialize = () => [mainElement, footerElement].forEach((currentElement, index) => {
 		const originalPreElement = currentElement.querySelector('pre.original-pre');
 		const translatedPreElement = currentElement.querySelector('pre.translated-pre');
-		const originalLines = originalPreElement?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
-		const translatedLines = translatedPreElement?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
+		let originalLines = originalPreElement?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
+		let translatedLines = translatedPreElement?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
 		// 原文と現代語訳で行数が一致しなければスキップ
 		if (originalLines.length !== translatedLines.length) { return; }
 		if (index === 0) {
 			// mainタグ内の時、本文を記憶する
-			mainOriginalLines = originalLines;
-			mainTranslatedLines = translatedLines;
+			// preタグ喪失している場合は、読み込んだデータから復活させる。
+			if (originalLines) { mainOriginalLines = originalLines; } else { originalLines = mainOriginalLines; }
+			if (translatedLines) { mainTranslatedLines = translatedLines; } else { translatedLines = mainTranslatedLines; }
 		}
 
 		// コンテンツの書き換え
@@ -344,35 +400,38 @@ document.addEventListener('DOMContentLoaded', async function () {
 				});
 			}
 		}
+
+		const dlElement = document.createElement('dl');
+		const fotterDcs = {
+			'DC.Rights': '権利',
+			'DC.Contributor': '訳者（機械翻訳による）',
+			'DC.Description': '説明',
+			'DC.Date': '最終更新日',
+			'DC.Relation': '関係資料'
+		};
+
+		footerElement.appendChild(document.createElement('br'));
+
+		for (const [key, value] of Object.entries(fotterDcs)) {
+			const dtElement = document.createElement('dt');
+			const ddElement = document.createElement('dd');
+			dtElement.id = key + '-title';
+			dtElement.innerHTML = value;
+			ddElement.id = key + '-document';
+			ddElement.innerHTML = convertUrlsToLinks(document.querySelector(`meta[name='${key}']`).content);
+			dlElement.appendChild(dtElement);
+			dlElement.appendChild(ddElement);
+			footerElement.appendChild(dlElement);
+		}
 	});
 
-	const dlElement = document.createElement('dl');
-	const fotterDcs = {
-		'DC.Rights': '権利',
-		'DC.Contributor': '訳者（機械翻訳による）',
-		'DC.Description': '説明',
-		'DC.Date': '最終更新日',
-		'DC.Relation': '関係資料'
-	};
-
-	footerElement.appendChild(document.createElement('br'));
-
-	for (const [key, value] of Object.entries(fotterDcs)) {
-		const dtElement = document.createElement('dt');
-		const ddElement = document.createElement('dd');
-		dtElement.id = key + '-title';
-		dtElement.innerHTML = value;
-		ddElement.id = key + '-document';
-		ddElement.innerHTML = convertUrlsToLinks(document.querySelector(`meta[name='${key}']`).content);
-		dlElement.appendChild(dtElement);
-		dlElement.appendChild(ddElement);
-		footerElement.appendChild(dlElement);
-	}
+	// 画面の状態を初期化する
+	displayInitialize();
 
 	// 現在表示されている吹き出しの要素
 	let currentOpenTooltip = null;
 
-	// その他の要素がクリックされた時のイベントリスナー
+	// その他の要素がクリックされた時のイベントリスナー追加
 	document.body.addEventListener('click', (event) => {
 		// ポップアップ要素のクリックは除外する
 		const popupElement = event.target.closest('#customContextMenu,#bookmarkListsModal,.original-text.show');
@@ -438,7 +497,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 				// 'bookmark'クラスの操作の後、ブックマーク行番号を取得して更新する
 				bookmarkRows = getBookmarkRows();
 				// ブックマークリストをローカルストレージに保存する
-				localStorage.setItem("aozoraModernJapaneseTranslation_BookmarkRows", bookmarkRows.join(','));
+				localStorage.setItem(`aozoraModernJapaneseTranslation_BookmarkRows_${addFilename}`, bookmarkRows.join(','));
 			}
 		}
 
@@ -452,7 +511,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 		}
 	});
 
-	// contextmenu イベントリスナー (右クリック/長押し)
+	// contextmenu イベントリスナー追加 (右クリック/長押し)
 	document.body.addEventListener('contextmenu', (event) => {
 		customContextMenuElement.style.display = 'none';
 		currentTargetElement = null;
@@ -477,7 +536,10 @@ document.addEventListener('DOMContentLoaded', async function () {
 	bookmarkListsModalElement = document.getElementById('bookmarkListsModal');
 	// 本文変更モーダルウィンドウの取得
 	editSentenceModalElement = document.getElementById('editSentenceModal');
-
+	// 汎用メッセージボックスモーダルウィンドウの取得
+	commonMessageBoxModalElement = document.getElementById('commonMessageBoxModal');
+	// 編集内容のファイル読み込みボタンの取得
+	editDataJsonFileInputElement = document.getElementById('editDataJsonFileInput');
 	/** コンテキストメニューのターゲット要素 */
 	let currentTargetElement = null;
 	/** コンテキストメニューのターゲット行番号 */
@@ -578,7 +640,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 	}
 
 	// メニュー項目がクリックされた時の処理
-	customContextMenuElement.addEventListener('click', (event) => {
+	customContextMenuElement.addEventListener('click', async (event) => {
 		const action = event.target.closest('li[data-action]').dataset.action;
 		if (action) {
 			if (action === 'bookmark-set-un-set') {
@@ -590,7 +652,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 				// 'bookmark'クラスの操作の後、ブックマーク行番号を取得して更新する
 				bookmarkRows = getBookmarkRows();
 				// ブックマークリストをローカルストレージに保存する
-				localStorage.setItem("aozoraModernJapaneseTranslation_BookmarkRows", bookmarkRows.join(','));
+				localStorage.setItem(`aozoraModernJapaneseTranslation_BookmarkRows_${addFilename}`, bookmarkRows.join(','));
 			} else if (action === 'bookmark-list-open') {
 				// ブックマークリスト表示
 				popupBookmarkListsModal();
@@ -601,6 +663,29 @@ document.addEventListener('DOMContentLoaded', async function () {
 					// 行クリック時、本文変更モーダルウィンドウの表示をする
 					editSentenceModal();
 				}
+				// メニューは閉じない
+				return;
+			} else if (action === 'modified-list-load-or-save') {
+				// メッセージボックスを表示する
+				await commonMessageBoxModal('', '編集内容ファイルの保存/読み込み', [
+					{
+						html: '保存する', callback: () => {
+							// editData.jsonダウンロード
+							saveJson("editData.json", JSON.stringify(modRows, null, 1))
+						}
+					},	// 編集内容のファイル読み込みボタンのクリックイベントを実行してファイル読み込みする
+					{ html: '読み込み', callback: () => editDataJsonFileInputElement.click() },
+					{
+						html: '初期状態に戻す', callback: () => {
+							if (window.confirm('初期状態に戻すと変更内容が消えます。\n先に保存してから戻す事をお勧めします。')) {
+								localStorage.removeItem(`aozoraModernJapaneseTranslation_ModRows_${addFilename}`);
+								modRows = {};
+								// 画面の状態を初期化する
+								displayInitialize();
+							}
+						}
+					},
+				]);
 				// メニューは閉じない
 				return;
 			} else if (action === 'share-to-twitter') {
@@ -625,7 +710,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 		currentTargetElement = null;
 	});
 
-	// Twitterへ共有するボタンが押下された時のイベントリスナー
+	// Twitterへ共有するボタンが押下された時のイベントリスナー追加
 	document.getElementById('shareToTwitter').addEventListener('click', () => {
 		const anker = currentTargetElement.id ? '#' + currentTargetElement.id : '';
 		const pageUrl = encodeURIComponent(window.location.origin + window.location.pathname + anker);
@@ -643,7 +728,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 		window.open(shareUrl, '_blank', 'noopener,noreferrer');
 	});
 
-	// キーボード押下時のイベントリスナー
+	// キーボード押下時のイベントリスナー追加
 	document.addEventListener('keydown', (event) => {
 		// Escapeキー押下で開いているものを閉じる
 		if (event.key === 'Escape') {
@@ -682,7 +767,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 				// 'bookmark'クラスの操作の後、ブックマーク行番号を取得して更新する
 				bookmarkRows = getBookmarkRows();
 				// ブックマークリストをローカルストレージに保存する
-				localStorage.setItem("aozoraModernJapaneseTranslation_BookmarkRows", bookmarkRows.join(','));
+				localStorage.setItem(`aozoraModernJapaneseTranslation_BookmarkRows_${addFilename}`, bookmarkRows.join(','));
 			}
 		} else if (event.key === 'ContextMenu') {
 			isTriggeredByKeyboardContextMenuKey = true;
@@ -762,7 +847,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 	/** マウスカーソルの座標 */
 	const mousePosition = { x: 0, y: 0 };
 
-	// mousemove イベントリスナーに追加
+	// mousemove イベントリスナー追加に追加
 	document.addEventListener('mousemove', (event) => {
 		// 常にマウスカーソルの位置を更新する
 		mousePosition.x = event.clientX;
@@ -773,6 +858,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 	const bookmarkListsModalCloseButton = bookmarkListsModalElement.querySelector('.close-button');
 	/** ブックマークモーダルウィンドウ閉じるボタン */
 	const editSentenceModalCloseButton = editSentenceModalElement.querySelector('.close-button');
+	/** 汎用メッセージボックスモーダル閉じるボタン */
+	const commonMessageBoxModalCloseButton = commonMessageBoxModalElement.querySelector('.close-button');
 	/** ブックマークリスト表示欄 */
 	const bookmarkList = document.getElementById('bookmarkList');
 	/** 目次リスト表示欄 */
@@ -863,7 +950,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 		bookmarkListsModalElement.style.display = 'none';
 	}
 
-	// 閉じるボタンイベントリスナーの設定
+	// 閉じるボタンイベントリスナー追加
 	bookmarkListsModalCloseButton.addEventListener('click', closeToBookmarkListsModal);
 
 	// モーダルコンテンツ以外をクリックした時、モーダルウィンドウを閉じる
@@ -939,7 +1026,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 			// 画面に変更を反映する
 			currentTargetElement.innerHTML = editHTML;
 			// ローカルストレージ変更内容を記録する
-			localStorage.setItem('aozoraModernJapaneseTranslation_modRows', JSON.stringify(modRows));
+			localStorage.setItem(`aozoraModernJapaneseTranslation_ModRows_${addFilename}`, JSON.stringify(modRows));
 		}
 	}
 
@@ -960,9 +1047,9 @@ document.addEventListener('DOMContentLoaded', async function () {
 	rollbackToTranslatedButton.addEventListener('click', () => {
 		editSentenceAreaElement.innerText = mainTranslatedLines[currentTargetRowNumber - 1];
 	});
-	// ✕ボタンのイベントリスナー
+	// ✕ボタンのイベントリスナー追加
 	editSentenceModalCloseButton.addEventListener('click', closeToEditSentenceModal);
-	// 閉じるボタンのイベントリスナー
+	// 閉じるボタンのイベントリスナー追加
 	editSentenceModalCloseButton2.addEventListener('click', closeToEditSentenceModal);
 
 	// モーダルコンテンツ以外をクリックした時、モーダルウィンドウを閉じる
@@ -973,14 +1060,113 @@ document.addEventListener('DOMContentLoaded', async function () {
 		}
 	});
 
+	/** 汎用メッセージボックスモーダルウィンドウの表示をする */
+	const commonMessageBoxModal = (messageHTML = null, headingHTML = null, buttonList = null) => {
+		const messageAreaElement = commonMessageBoxModalElement.querySelector('.border-block');
+		if (messageHTML) {
+			messageAreaElement.innerHTML = messageHTML;
+		} else {
+			messageAreaElement.style.display = 'none';
+		}
+		const headingElement = commonMessageBoxModalElement.querySelector('h2');
+		if (headingHTML) {
+			headingElement.innerHTML = headingHTML;
+		} else {
+			headingElement.innerHTML = 'メッセージ';
+		}
+		const buttonsBarElement = commonMessageBoxModalElement.querySelector('.buttons-bar');
+		buttonsBarElement.innerHTML = '';
+
+		// 汎用メッセージボックスモーダルウィンドウの表示
+		commonMessageBoxModalElement.style.display = 'flex';
+
+		// Promiseを返す
+		return new Promise((resolve) => {
+			/** 汎用メッセージボックスモーダルウィンドウを閉じる */
+			const closeToCommonMessageBoxModal = () => {
+				commonMessageBoxModalElement.style.display = 'none';
+				resolve(0);
+			}
+			if (buttonList) {
+				// ボタンリストがある場合は、各ボタンとコールバック関数を登録する
+				buttonList.forEach((buttonItem, index) => {
+					const id = index + 1;
+					const buttonElement = document.createElement('button');
+					buttonElement.id = `MsgBoxButton_${id}`;
+					buttonElement.innerHTML = buttonItem.html;
+					buttonElement.addEventListener('click', () => {
+						buttonItem.callback();
+						resolve(id);
+					});
+					buttonsBarElement.appendChild(buttonElement);
+				});
+			} else {
+				// ボタンリストがある場合は、各ボタンとコールバック関数を登録する
+				const buttonElement = document.createElement('button');
+				buttonElement.id = `MsgBoxButton_${1}`;
+				buttonElement.innerHTML = '閉じる';
+				buttonElement.addEventListener('click', closeToCommonMessageBoxModal);
+				buttonsBarElement.appendChild(buttonElement);
+			}
+
+			// ✕ボタンのイベントリスナー追加
+			commonMessageBoxModalCloseButton.addEventListener('click', closeToCommonMessageBoxModal);
+
+			// モーダルコンテンツ以外をクリックした時、モーダルウィンドウを閉じる
+			commonMessageBoxModalElement.addEventListener('click', (event) => {
+				event.stopPropagation();
+				if (event.target === commonMessageBoxModalElement) {
+					closeToCommonMessageBoxModal();
+				}
+			});
+		});
+	}
+
 	/** フォントサイズを変更する */
 	const changeFontSize = () => {
-		let before = Number(localStorage.getItem('aozoraModernJapaneseTranslation_fontsize') || 3);
+		let before = Number(localStorage.getItem(`aozoraModernJapaneseTranslation_FontSize_${addFilename}`) || 3);
 		let after = before + 1;
 		if (after > 5) { after = 1; }
 		document.body.classList.remove(`size${before}`);
 		document.body.classList.add(`size${after}`);
-		localStorage.setItem('aozoraModernJapaneseTranslation_fontsize', after);
+		localStorage.setItem(`aozoraModernJapaneseTranslation_FontSize_${addFilename}`, after);
 	}
 
+	// 編集内容のファイル読み込みボタンをクリックしてファイルが読み込まれた時のイベントリスナー追加
+	editDataJsonFileInputElement.addEventListener('change', (event) => {
+		if (event.target.files.length >= 2) {
+			// 本来通らない処理だが、安全策として用意している。
+			alert('ファイルが複数選択されています。');
+			return;
+		}
+		const selectedFile = event.target.files[0];
+		if (selectedFile) {
+			console.log('選択されたファイル名:', selectedFile.name);
+
+			const reader = new FileReader();
+			// onloadイベントハンドラ
+			reader.onload = (e) => {
+				try {
+					modRows = JSON.parse(e.target.result);
+					localStorage.setItem(`aozoraModernJapaneseTranslation_ModRows_${addFilename}`, e.target.result);
+					// 画面の状態を初期化する
+					displayInitialize();
+				} catch (error) {
+					// JSONパース中にエラーが発生した場合
+					console.error('JSONファイルのパース中にエラーが発生しました:', error);
+					alert('編集内容のファイルが有効なファイルではありません。');
+				}
+			};
+			// ファイルの読み込み中にエラーが発生したときのイベントハンドラ
+			reader.onerror = (e) => {
+				console.error('ファイルの読み込み中にエラーが発生しました:', e.target.error);
+				alert('ファイルの読み込み中にエラーが発生しました。');
+			};
+
+			// ファイルの読み込み開始、onloadイベントの発火
+			reader.readAsText(selectedFile);
+		} else {
+			alert('ファイルが選択されていません。');
+		}
+	});
 });
