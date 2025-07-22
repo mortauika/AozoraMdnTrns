@@ -303,14 +303,19 @@ document.addEventListener('DOMContentLoaded', async function () {
 	footerElement = document.querySelector('footer');
 
 	/** 画面の状態を初期化する */
-	const displayInitialize = () => [mainElement, footerElement].forEach((currentElement, index) => {
+	const displayInitialize = () => [mainElement, footerElement].forEach((currentElement, blockElementIndex) => {
 		const originalPreElement = currentElement.querySelector('pre.original-pre');
 		const translatedPreElement = currentElement.querySelector('pre.translated-pre');
 		let originalLines = originalPreElement?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
 		let translatedLines = translatedPreElement?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
 		// 原文と現代語訳で行数が一致しなければスキップ
 		if (originalLines.length !== translatedLines.length) { return; }
-		if (index === 0) {
+		if (originalLines.length === 0) {
+			// 全文現代語訳が無い場合は、原文と現代語訳両方に同じ内容を入れる。
+			originalLines = currentElement.querySelector('pre')?.innerHTML.replace(/\r?\n|\r/g, '\n').trim('\n').split('\n') ?? '';
+			translatedLines = originalLines;
+		}
+		if (blockElementIndex === 0) {
 			// mainタグ内の時、本文を記憶する
 			// preタグ喪失している場合は、読み込んだデータから復活させる。
 			if (originalLines) { mainOriginalLines = originalLines; } else { originalLines = mainOriginalLines; }
@@ -321,25 +326,25 @@ document.addEventListener('DOMContentLoaded', async function () {
 		const length = originalLines.length;
 		currentElement.innerHTML = '';
 
-		for (let index = 0; index < length; index++) {
-			const rowNumber = index + 1;
-			const originalLine = originalLines[index];
-			const translatedLine = translatedLines[index];
+		for (let rowIndex = 0; rowIndex < length; rowIndex++) {
+			const rowNumber = rowIndex + 1;
+			const originalLine = originalLines[rowIndex];
+			const translatedLine = translatedLines[rowIndex];
 			if (originalLine === translatedLine && originalLine === '' && translatedLine === '' && (rowNumber in modRows) === false) {
 				// 空白行は<br>タグ追加
 				currentElement.appendChild(document.createElement('br'));
 			} else {
-				let idList = [];
+				let itemIds = [];
 				const lineList = [originalLine, translatedLine];
-				if (originalLine === translatedLine && (rowNumber in modRows) === false) {
+				if (blockElementIndex !== 0 || originalLine === translatedLine && (rowNumber in modRows) === false) {
 					// 新旧で差異が無い行
-					idList = [`row-${rowNumber}`];
+					itemIds = [`row-${rowNumber}`];
 				} else {
-					idList = [`original-row-${rowNumber}`, `translated-row-${rowNumber}`];
+					itemIds = [`original-row-${rowNumber}`, `translated-row-${rowNumber}`];
 				}
-				idList.forEach((id, index) => {
-					let line = lineList[index];
-					if (index && (rowNumber in modRows)) {
+				itemIds.forEach((id, itemIndex) => {
+					let line = lineList[itemIndex];
+					if (itemIndex && (rowNumber in modRows)) {
 						// translated-text 現代語訳の時かつ、該当行の変更がされている場合は、
 						// 変更文の内容で書き換える
 						line = modRows[rowNumber];
@@ -350,15 +355,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 						// 見出し
 						const headingElement = document.createElement('h2');
 						headingElement.id = id;
-						if (idList.length >= 2) {
-							if (index === 0) {
+						if (itemIds.length >= 2) {
+							if (itemIndex === 0) {
 								headingElement.classList.add('original-text');
 							} else {
 								headingElement.classList.add('translated-text');
 								headingElement.dataset.originalTarget = `original-row-${rowNumber}`;
 							}
 						}
-						if (index && bookmarkRows.includes(rowNumber)) {
+						if (itemIndex && bookmarkRows.includes(rowNumber)) {
 							headingElement.classList.add('bookmark');
 						}
 						const indentInfo = extractIndentInfo(headingLine);
@@ -375,15 +380,15 @@ document.addEventListener('DOMContentLoaded', async function () {
 						// 文
 						const pElement = document.createElement('p');
 						pElement.id = id;
-						if (idList.length >= 2) {
-							if (index === 0) {
+						if (itemIds.length >= 2) {
+							if (itemIndex === 0) {
 								pElement.classList.add('original-text');
 							} else {
 								pElement.classList.add('translated-text');
 								pElement.dataset.originalTarget = `original-row-${rowNumber}`;
 							}
 						}
-						if (index && bookmarkRows.includes(rowNumber)) {
+						if (itemIndex && bookmarkRows.includes(rowNumber)) {
 							pElement.classList.add('bookmark');
 						}
 						const indentInfo = extractIndentInfo(line);
@@ -575,9 +580,12 @@ document.addEventListener('DOMContentLoaded', async function () {
 
 		// メニューを表示する
 		customContextMenuElement.style.display = 'block';
-
-		// コンテキストメニューのターゲット行番号を記録
-		currentTargetRowNumber = getRowNumberFromElementId(target.id);
+		if (target.closest('main')) {
+			// コンテキストメニューのターゲット行番号を記録
+			currentTargetRowNumber = getRowNumberFromElementId(target.id);
+		} else {
+			currentTargetRowNumber = 0;
+		}
 
 		/** ブックマークボタン */
 		const listItemBookmarkSetUnSetElement = customContextMenuElement.querySelector('li[data-action="bookmark-set-un-set"]');
