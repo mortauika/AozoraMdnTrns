@@ -362,7 +362,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 					// ［＃...は中見出し］ の 注釈を削除
 					let headingLine = line.replace(/［＃[^］]*は中見出し］/g, '');
 					if (line !== headingLine) {
-						// 見出し
+						// 中見出し
 						const headingElement = document.createElement('h2');
 						headingElement.id = id;
 						if (itemIds.length >= 2) {
@@ -373,7 +373,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 								headingElement.dataset.originalTarget = `original-row-${rowNumber}`;
 							}
 						}
-						if (itemIndex && bookmarkRows.includes(rowNumber)) {
+						if (itemIndex + 1 === itemIds.length && bookmarkRows.includes(rowNumber)) {
 							headingElement.classList.add('bookmark');
 						}
 						const indentInfo = extractIndentInfo(headingLine);
@@ -398,7 +398,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 								pElement.dataset.originalTarget = `original-row-${rowNumber}`;
 							}
 						}
-						if (itemIndex && bookmarkRows.includes(rowNumber)) {
+						if (itemIndex + 1 === itemIds.length && bookmarkRows.includes(rowNumber)) {
 							pElement.classList.add('bookmark');
 						}
 						const indentInfo = extractIndentInfo(line);
