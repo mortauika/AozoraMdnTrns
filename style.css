@@ -287,10 +287,6 @@ footer a {
 }
 
 /* 本文変更ウィンドウのスタイル */
-#editSentenceModal>.modal-content {
-    max-width: 90vw;
-}
-
 #editSentenceModal #editSentenceArea {
     margin: 1em 0;
     padding: 0.25em;
@@ -372,6 +368,17 @@ footer a {
         border-left-width: 0.5em;
         margin-left: -1em;
         padding-left: 0.5em;
+    }
+
+    .modal-content {
+        min-width: 90vw;
+        max-width: 90vw;
+    }
+
+    .modal-content .buttons-bar {
+        padding-top: 0.25em;
+        padding-bottom: 0.25em;
+        font-size: 0.75em;
     }
 }
 
