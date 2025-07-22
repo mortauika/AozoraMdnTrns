@@ -32,6 +32,8 @@ let editDataJsonFileInputElement;
 let mainOriginalLines = [];
 /** mainの現代語訳の文書 */
 let mainTranslatedLines = [];
+/** footerの文書 */
+let footerLines = [];
 /** 変更行の連想配列 */
 let modRows = {};
 
@@ -320,6 +322,14 @@ document.addEventListener('DOMContentLoaded', async function () {
 			// preタグ喪失している場合は、読み込んだデータから復活させる。
 			if (originalLines) { mainOriginalLines = originalLines; } else { originalLines = mainOriginalLines; }
 			if (translatedLines) { mainTranslatedLines = translatedLines; } else { translatedLines = mainTranslatedLines; }
+		} else if (blockElementIndex === 1) {
+			// footerタグ内の時、本文を記憶する
+			// preタグ喪失している場合は、読み込んだデータから復活させる。
+			if (originalLines) { footerLines = originalLines; } else { translatedLines = originalLines = footerLines; }
+		} else {
+			// 処理記述漏れ
+			console.error(`内部エラー: 必要な処理が用意されていません`);
+			return;
 		}
 
 		// コンテンツの書き換え
