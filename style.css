@@ -139,6 +139,11 @@ footer a {
     overflow-wrap: break-word;
 }
 
+/* 文字装飾 */
+.bouten {
+    text-emphasis: sesame;
+}
+
 /* カスタムメニューのスタイル */
 .custom-context-menu {
     position: absolute;

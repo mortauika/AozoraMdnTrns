@@ -41,11 +41,30 @@ let modRows = {};
 // **** 関数 ****
 
 /**
+ * テキストから「［＃「***」に傍点］」のぼうてんを付けたテキストを返す。
+ * @param {string} line 処理対象となる行のテキスト。
+ * @returns {string} 置換後ののテキスト。
+ */
+function extractBoutenInfo(line) {
+	// 「［＃「***」に傍点］」のパターン
+	const pattern = /([^\s］]*)［＃*「([^」]*)」に傍点］/gu;
+	// マッチした文字列を抽出
+	const matches = Array.from(line.matchAll(pattern));
+	for (i = matches.length - 1; i >= 0; i--) {
+		const match = matches[i];
+		const lineBefore = line.slice(0, match.index);
+		const lineAfter = line.slice(match.index + match[0].length);
+		line = lineBefore + match[1].slice(0, match[1].lastIndexOf(match[2])) + '<strong class="bouten">' + match[2] + '</strong>' + lineAfter;
+	}
+	return line;
+}
+
+/**
  * テキストから「［＃N字下げ］」形式の字下げ指定を抽出し、その数値と指定削除後のテキストを返す。
  * @brief
  * * 全角数字は半角に変換され、数値として返される。
  * * 複数マッチ時は最初の字下げ指定のみが処理される。
- * @param {string} text 処理対象となる行のテキスト。
+ * @param {string} line 処理対象となる行のテキスト。
  * @returns {{number: number, cleanedLine: string}|null}
  * * 字下げ数 (`number`) と削除後のテキスト (`cleanedLine`) を持つオブジェクト、
  *   または指定が見つからない場合は `null`。
@@ -359,6 +378,8 @@ document.addEventListener('DOMContentLoaded', async function () {
 						// 変更文の内容で書き換える
 						line = modRows[rowNumber];
 					}
+					// 「［＃「***」に傍点］」のぼうてんをつける
+					line = extractBoutenInfo(line);
 					// ［＃...は中見出し］ の 注釈を削除
 					let headingLine = line.replace(/［＃[^］]*は中見出し］/g, '');
 					if (line !== headingLine) {
@@ -376,6 +397,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 						if (itemIndex + 1 === itemIds.length && bookmarkRows.includes(rowNumber)) {
 							headingElement.classList.add('bookmark');
 						}
+						// 「［＃N字下げ］」の字下げ分インデントする
 						const indentInfo = extractIndentInfo(headingLine);
 						if (indentInfo) {
 							headingElement.style.textIndent = `${indentInfo.number}em`;
@@ -401,6 +423,7 @@ document.addEventListener('DOMContentLoaded', async function () {
 						if (itemIndex + 1 === itemIds.length && bookmarkRows.includes(rowNumber)) {
 							pElement.classList.add('bookmark');
 						}
+						// 「［＃N字下げ］」の字下げ分インデントする
 						const indentInfo = extractIndentInfo(line);
 						if (indentInfo) {
 							pElement.style.textIndent = `${indentInfo.number}em`;
